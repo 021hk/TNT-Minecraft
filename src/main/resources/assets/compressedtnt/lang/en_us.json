@@ -1,0 +1,15 @@
+{
+	"block.compressedtnt.compressed_tnt": "Compressed TNT",
+	"block.compressedtnt.double_compressed_tnt": "Double Compressed TNT",
+	"block.compressedtnt.triple_compressed_tnt": "Triple Compressed TNT",
+	"block.compressedtnt.quadruple_compressed_tnt": "Quadruple Compressed TNT",
+	"block.compressedtnt.quintuple_compressed_tnt": "Quintuple Compressed TNT",
+	"block.compressedtnt.sextuple_compressed_tnt": "Sextuple Compressed TNT",
+	"block.compressedtnt.septuple_compressed_tnt": "Septuple Compressed TNT",
+	"block.compressedtnt.octuple_compressed_tnt": "Octuple Compressed TNT",
+	"block.compressedtnt.nonuple_compressed_tnt": "Nonuple Compressed TNT",
+	"block.compressedtnt.decuple_compressed_tnt": "Decuple Compressed TNT",
+	"compressedtnt.power_tooltip": "Power: %sx TNT",
+	"compressedtnt.fuse_hint": "Right-click with a Clock: fuse +1s (Shift: -1s)",
+	"compressedtnt.fuse_set": "Fuse timer: %ss"
+}

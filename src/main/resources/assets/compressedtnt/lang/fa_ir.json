@@ -1,0 +1,15 @@
+{
+	"block.compressedtnt.compressed_tnt": "TNT فشرده",
+	"block.compressedtnt.double_compressed_tnt": "TNT دوبار فشرده",
+	"block.compressedtnt.triple_compressed_tnt": "TNT سه‌بار فشرده",
+	"block.compressedtnt.quadruple_compressed_tnt": "TNT چهاربار فشرده",
+	"block.compressedtnt.quintuple_compressed_tnt": "TNT پنج‌بار فشرده",
+	"block.compressedtnt.sextuple_compressed_tnt": "TNT شش‌بار فشرده",
+	"block.compressedtnt.septuple_compressed_tnt": "TNT هفت‌بار فشرده",
+	"block.compressedtnt.octuple_compressed_tnt": "TNT هشت‌بار فشرده",
+	"block.compressedtnt.nonuple_compressed_tnt": "TNT نه‌بار فشرده",
+	"block.compressedtnt.decuple_compressed_tnt": "TNT ده‌بار فشرده",
+	"compressedtnt.power_tooltip": "قدرت انفجار: %s برابر TNT معمولی",
+	"compressedtnt.fuse_hint": "با ساعت راست‌کلیک: ۱ ثانیه اضافه (با شیفت: ۱ ثانیه کم)",
+	"compressedtnt.fuse_set": "تایمر انفجار: %s ثانیه"
+}

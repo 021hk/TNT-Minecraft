@@ -1,0 +1,13 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"category": "redstone",
+	"ingredients": [
+		{
+			"item": "compressedtnt:sextuple_compressed_tnt"
+		}
+	],
+	"result": {
+		"id": "compressedtnt:quintuple_compressed_tnt",
+		"count": 9
+	}
+}

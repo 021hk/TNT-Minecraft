@@ -1,0 +1,29 @@
+{
+        "schemaVersion": 1,
+        "id": "compressedtnt",
+        "version": "${version}",
+        "name": "TNT Minecraft",
+        "description": "Combine 9 TNT into one compressed TNT block. 10 tiers, each tier 9x stronger than the last (up to ~3.5 billion times normal TNT). High tiers detonate with a nuke-style area wipe and the fuse timer is adjustable with a Clock.",
+        "authors": ["021hk"],
+        "contact": {},
+        "license": "MIT",
+        "icon": "assets/compressedtnt/icon.png",
+        "environment": "*",
+        "entrypoints": {
+                "main": [
+                        "net.compressedtnt.CompressedTnt"
+                ],
+                "client": [
+                        "net.compressedtnt.client.CompressedTntClient"
+                ]
+        },
+        "mixins": [
+                "compressedtnt.mixins.json"
+        ],
+        "depends": {
+                "fabricloader": ">=0.16.0",
+                "minecraft": ">=1.21 <=1.21.1",
+                "java": ">=21",
+                "fabric-api": "*"
+        }
+}

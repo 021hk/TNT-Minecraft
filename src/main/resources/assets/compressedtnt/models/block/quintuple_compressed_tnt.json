@@ -1,0 +1,6 @@
+{
+	"parent": "minecraft:block/cube_all",
+	"textures": {
+		"all": "compressedtnt:block/quintuple_compressed_tnt"
+	}
+}

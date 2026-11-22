@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"pattern": [
+		"XXX",
+		"XXX",
+		"XXX"
+	],
+	"key": {
+		"X": {
+			"item": "compressedtnt:quadruple_compressed_tnt"
+		}
+	},
+	"result": {
+		"id": "compressedtnt:quintuple_compressed_tnt",
+		"count": 1
+	}
+}

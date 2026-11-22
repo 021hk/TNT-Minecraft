@@ -1,0 +1,18 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		maven {
+			name = 'GoogleCentralMirror'
+			url = 'https://maven-central.storage-download.googleapis.com/maven2/'
+		}
+		maven {
+			name = 'AliyunPublic'
+			url = 'https://maven.aliyun.com/repository/public/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
