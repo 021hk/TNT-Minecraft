@@ -23,11 +23,12 @@ import net.minecraft.world.World;
  * explosion chains works exactly like vanilla TNT (all vanilla paths end up
  * spawning the entity through TntBlock.primeTnt or onDestroyedByExplosion,
  * which our mixin redirects), but spawns our own entity carrying the real
- * tier power. Holding a Clock and right-clicking the placed block adjusts the
- * fuse timer (1-30 seconds, default 4).
+ * tier power. The fuse timer (1-300 seconds, default 4) can be set:
+ * - in advance: hold the item and press the +/- keybindings (Shift = +/-10s)
+ * - in world: right-click the placed block with a Clock (+1s, Shift -1s)
  */
 public class CompressedTntBlock extends TntBlock {
-        public static final IntProperty FUSE = IntProperty.of("fuse", 1, 30);
+        public static final IntProperty FUSE = IntProperty.of("fuse", 1, CompressedTntBlockItem.MAX_FUSE_SECONDS);
         public final int tier;
 
         public CompressedTntBlock(int tier, AbstractBlock.Settings settings) {
@@ -44,7 +45,7 @@ public class CompressedTntBlock extends TntBlock {
 
         @Override
         public BlockState getPlacementState(ItemPlacementContext ctx) {
-                return this.getDefaultState().with(FUSE, 4);
+                return this.getDefaultState().with(FUSE, CompressedTntBlockItem.getFuseSeconds(ctx.getStack()));
         }
 
         @Override
@@ -52,7 +53,9 @@ public class CompressedTntBlock extends TntBlock {
                 if (stack.isOf(Items.CLOCK)) {
                         if (!world.isClient) {
                                 int current = state.get(FUSE);
-                                int next = player.isSneaking() ? Math.max(1, current - 1) : Math.min(30, current + 1);
+                                int next = player.isSneaking()
+                                                ? Math.max(CompressedTntBlockItem.MIN_FUSE_SECONDS, current - 1)
+                                                : Math.min(CompressedTntBlockItem.MAX_FUSE_SECONDS, current + 1);
                                 if (next != current) {
                                         world.setBlockState(pos, state.with(FUSE, next), Block.NOTIFY_ALL);
                                 }

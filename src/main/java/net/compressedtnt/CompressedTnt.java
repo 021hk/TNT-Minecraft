@@ -2,6 +2,8 @@ package net.compressedtnt;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.entity.EntityDimensions;
@@ -12,8 +14,11 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.BlockSoundGroup;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +63,25 @@ public class CompressedTnt implements ModInitializer {
                                                 entries.add(block);
                                         }
                                 });
+
+                // keyboard fuse setting: client sends +/- deltas while holding a
+                // compressed TNT item; the server applies them to the item's data
+                PayloadTypeRegistry.playC2S().register(SetFusePayload.ID, SetFusePayload.CODEC);
+                ServerPlayNetworking.registerGlobalReceiver(SetFusePayload.ID, (payload, context) -> {
+                        ServerPlayerEntity player = context.player();
+                        net.minecraft.item.ItemStack stack = player.getMainHandStack();
+                        if (!(stack.getItem() instanceof CompressedTntBlockItem)) {
+                                stack = player.getOffHandStack();
+                        }
+                        if (stack.getItem() instanceof CompressedTntBlockItem) {
+                                int next = MathHelper.clamp(
+                                                CompressedTntBlockItem.getFuseSeconds(stack) + payload.delta(),
+                                                CompressedTntBlockItem.MIN_FUSE_SECONDS,
+                                                CompressedTntBlockItem.MAX_FUSE_SECONDS);
+                                CompressedTntBlockItem.setFuseSeconds(stack, next);
+                                player.sendMessage(Text.translatable("compressedtnt.fuse_set", next), true);
+                        }
+                });
 
                 LOGGER.info("Compressed TNT loaded: {} tiers, tier 10 = {}x TNT power", TIERS, multiplierOf(TIERS));
         }

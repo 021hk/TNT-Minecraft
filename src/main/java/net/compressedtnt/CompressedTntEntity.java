@@ -149,6 +149,10 @@ public class CompressedTntEntity extends TntEntity {
                 }
 
                 if (this.nukeRadius >= this.nukeMaxRadius) {
+                        // mop-up sweep: one full pass over the whole sphere so that no
+                        // block inside the blast can survive (guards against column/edge
+                        // edge cases reported by players as "some blocks remain")
+                        this.destroyShell(server, 0.0, this.nukeMaxRadius);
                         world.playSound(null, BlockPos.ofFloored(this.center), SoundEvents.ENTITY_GENERIC_EXPLODE.value(), SoundCategory.BLOCKS, 5.0f, 0.3f);
                         this.discard();
                 }
@@ -224,17 +228,19 @@ public class CompressedTntEntity extends TntEntity {
                         Block block = state.getBlock();
                         if (block instanceof CompressedTntBlock compressed) {
                                 // chain reaction: prime it instead of vaporizing it
-                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
+                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
                                 world.spawnEntity(new CompressedTntEntity(world, x + 0.5, y, z,
                                                 compressed.tier, compressed.power(), state.get(CompressedTntBlock.FUSE) * 20));
                                 continue;
                         }
                         if (state.isOf(Blocks.TNT)) {
-                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2);
+                                world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
                                 world.spawnEntity(new TntEntity(world, x + 0.5, y, z, null));
                                 continue;
                         }
-                        world.setBlockState(pos, Blocks.AIR.getDefaultState(), 2 | 16);
+                        // NOTIFY_ALL (no FORCE_STATE): neighbors get updates so
+                        // water/lava flow back in, sand/gravel fall, redstone updates
+                        world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
                 }
         }
 
