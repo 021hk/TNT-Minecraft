@@ -3,7 +3,7 @@
         "id": "compressedtnt",
         "version": "${version}",
         "name": "TNT Minecraft",
-        "description": "Combine 9 TNT into one compressed TNT block. 10 tiers, each tier 9x stronger than the last (up to ~3.5 billion times normal TNT). High tiers detonate with a nuke-style area wipe and the fuse timer is adjustable with a Clock.",
+        "description": "Combine 9 TNT into one compressed TNT block. 10 tiers, each exactly 9x stronger than the last (up to ~3.5 billion times normal TNT). Set the fuse with the G key (1-3600 s) or a Clock and it explodes exactly on time; without a timer it behaves like vanilla TNT. High tiers detonate with a nuke-style area wipe. English + Persian.",
         "authors": ["021hk"],
         "contact": {},
         "license": "MIT",

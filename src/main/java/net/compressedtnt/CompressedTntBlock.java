@@ -4,6 +4,10 @@ import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.TntBlock;
+import net.minecraft.block.BlockEntityProvider;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityTicker;
+import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.item.ItemStack;
@@ -23,12 +27,17 @@ import net.minecraft.world.World;
  * explosion chains works exactly like vanilla TNT (all vanilla paths end up
  * spawning the entity through TntBlock.primeTnt or onDestroyedByExplosion,
  * which our mixin redirects), but spawns our own entity carrying the real
- * tier power. The fuse timer (1-300 seconds, default 4) can be set:
- * - in advance: hold the item and press the +/- keybindings (Shift = +/-10s)
- * - in world: right-click the placed block with a Clock (+1s, Shift -1s)
+ * tier power.
+ *
+ * Timer systems:
+ *  - Clock right-click: starts / adjusts the live countdown (+1 s per click,
+ *    Shift: -1 s, at 1 s Shift cancels; up to 3600 s).
+ *  - The item's keyboard timer (G key) starts counting automatically when the
+ *    block is placed (see CompressedTntBlockItem.postPlacement).
+ *  - No timer set: behaves like vanilla TNT (normal 4 s fuse after ignition).
  */
-public class CompressedTntBlock extends TntBlock {
-        public static final IntProperty FUSE = IntProperty.of("fuse", 1, CompressedTntBlockItem.MAX_FUSE_SECONDS);
+public class CompressedTntBlock extends TntBlock implements BlockEntityProvider {
+        public static final IntProperty FUSE = IntProperty.of("fuse", 1, 30);
         public final int tier;
 
         public CompressedTntBlock(int tier, AbstractBlock.Settings settings) {
@@ -45,25 +54,45 @@ public class CompressedTntBlock extends TntBlock {
 
         @Override
         public BlockState getPlacementState(ItemPlacementContext ctx) {
-                return this.getDefaultState().with(FUSE, CompressedTntBlockItem.getFuseSeconds(ctx.getStack()));
+                return this.getDefaultState().with(FUSE, 4);
         }
 
         @Override
         protected ItemActionResult onUseWithItem(ItemStack stack, BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
                 if (stack.isOf(Items.CLOCK)) {
-                        if (!world.isClient) {
-                                int current = state.get(FUSE);
-                                int next = player.isSneaking()
-                                                ? Math.max(CompressedTntBlockItem.MIN_FUSE_SECONDS, current - 1)
-                                                : Math.min(CompressedTntBlockItem.MAX_FUSE_SECONDS, current + 1);
-                                if (next != current) {
-                                        world.setBlockState(pos, state.with(FUSE, next), Block.NOTIFY_ALL);
+                        if (!world.isClient && world.getBlockEntity(pos) instanceof CompressedTntBlockEntity be) {
+                                if (player.isSneaking()) {
+                                        int seconds = be.isArmed() ? be.getTimerSeconds() - 1 : 0;
+                                        if (seconds < 1) {
+                                                be.cancelTimer();
+                                                player.sendMessage(Text.translatable("compressedtnt.timer_cancelled"), true);
+                                        } else {
+                                                be.startTimer(seconds * 20);
+                                                player.sendMessage(Text.translatable("compressedtnt.timer_set", seconds), true);
+                                        }
+                                } else {
+                                        int seconds = be.isArmed() ? Math.min(3600, be.getTimerSeconds() + 1) : 5;
+                                        be.startTimer(seconds * 20);
+                                        player.sendMessage(Text.translatable("compressedtnt.timer_set", seconds), true);
                                 }
-                                player.sendMessage(Text.translatable("compressedtnt.fuse_set", next), true);
                         }
                         return ItemActionResult.success(world.isClient);
                 }
                 return super.onUseWithItem(stack, state, world, pos, player, hand, hit);
+        }
+
+        @Override
+        public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+                return new CompressedTntBlockEntity(pos, state);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
+                if (type != CompressedTnt.BLOCK_ENTITY_TYPE || world.isClient) {
+                        return null;
+                }
+                return (BlockEntityTicker<T>) (BlockEntityTicker<CompressedTntBlockEntity>) CompressedTntBlockEntity::tick;
         }
 
         public float power() {

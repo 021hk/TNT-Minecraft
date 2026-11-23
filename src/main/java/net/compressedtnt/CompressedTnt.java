@@ -1,22 +1,28 @@
 package net.compressedtnt;
 
+import com.mojang.serialization.Codec;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.minecraft.block.AbstractBlock;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.component.ComponentType;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import org.slf4j.Logger;
@@ -36,6 +42,15 @@ public class CompressedTnt implements ModInitializer {
 
         public static final CompressedTntBlock[] BLOCKS = new CompressedTntBlock[TIERS];
 
+        /** fuse timer (in seconds) stored on the ITEM via the G-key input screen */
+        public static final ComponentType<Integer> TIMER_SECONDS = ComponentType.<Integer>builder()
+                        .codec(Codec.intRange(0, 3600))
+                        .packetCodec(PacketCodecs.VAR_INT)
+                        .build();
+
+        /** registered after the blocks, in onInitialize */
+        public static BlockEntityType<CompressedTntBlockEntity> BLOCK_ENTITY_TYPE;
+
         public static final EntityType<CompressedTntEntity> PRIMED_COMPRESSED_TNT = Registry.register(
                         Registries.ENTITY_TYPE,
                         Identifier.of(MOD_ID, "primed_compressed_tnt"),
@@ -45,6 +60,8 @@ public class CompressedTnt implements ModInitializer {
 
         @Override
         public void onInitialize() {
+                Registry.register(Registries.DATA_COMPONENT_TYPE, Identifier.of(MOD_ID, "timer_seconds"), TIMER_SECONDS);
+
                 for (int i = 0; i < TIERS; i++) {
                         int tier = i + 1;
                         CompressedTntBlock block = new CompressedTntBlock(tier,
@@ -55,6 +72,11 @@ public class CompressedTnt implements ModInitializer {
                         BLOCKS[i] = block;
                 }
 
+                BLOCK_ENTITY_TYPE = Registry.register(
+                                Registries.BLOCK_ENTITY_TYPE,
+                                Identifier.of(MOD_ID, "compressed_tnt"),
+                                BlockEntityType.Builder.create(CompressedTntBlockEntity::new, BLOCKS).build(null));
+
                 RegistryKey<net.minecraft.item.ItemGroup> redstoneTab = RegistryKey.of(
                                 RegistryKeys.ITEM_GROUP, Identifier.ofVanilla("redstone"));
                 ItemGroupEvents.modifyEntriesEvent(redstoneTab).register(
@@ -64,26 +86,30 @@ public class CompressedTnt implements ModInitializer {
                                         }
                                 });
 
-                // keyboard fuse setting: client sends +/- deltas while holding a
-                // compressed TNT item; the server applies them to the item's data
-                PayloadTypeRegistry.playC2S().register(SetFusePayload.ID, SetFusePayload.CODEC);
-                ServerPlayNetworking.registerGlobalReceiver(SetFusePayload.ID, (payload, context) -> {
+                // keyboard timer: client screen sends the seconds, server stores them
+                // on the held compressed TNT item
+                PayloadTypeRegistry.playC2S().register(SetTimerPayload.ID, SetTimerPayload.CODEC);
+                ServerPlayNetworking.registerGlobalReceiver(SetTimerPayload.ID, (payload, context) -> {
                         ServerPlayerEntity player = context.player();
-                        net.minecraft.item.ItemStack stack = player.getMainHandStack();
-                        if (!(stack.getItem() instanceof CompressedTntBlockItem)) {
-                                stack = player.getOffHandStack();
+                        int seconds = MathHelper.clamp(payload.seconds(), 0, 3600);
+                        ItemStack main = player.getMainHandStack();
+                        ItemStack off = player.getOffHandStack();
+                        ItemStack target = main.getItem() instanceof CompressedTntBlockItem ? main
+                                        : off.getItem() instanceof CompressedTntBlockItem ? off : null;
+                        if (target == null) {
+                                return;
                         }
-                        if (stack.getItem() instanceof CompressedTntBlockItem) {
-                                int next = MathHelper.clamp(
-                                                CompressedTntBlockItem.getFuseSeconds(stack) + payload.delta(),
-                                                CompressedTntBlockItem.MIN_FUSE_SECONDS,
-                                                CompressedTntBlockItem.MAX_FUSE_SECONDS);
-                                CompressedTntBlockItem.setFuseSeconds(stack, next);
-                                player.sendMessage(Text.translatable("compressedtnt.fuse_set", next), true);
+                        if (seconds > 0) {
+                                target.set(TIMER_SECONDS, seconds);
+                                player.sendMessage(Text.translatable("compressedtnt.timer_set_item", seconds).formatted(Formatting.GOLD), true);
+                        } else {
+                                target.remove(TIMER_SECONDS);
+                                player.sendMessage(Text.translatable("compressedtnt.timer_removed").formatted(Formatting.YELLOW), true);
                         }
                 });
 
-                LOGGER.info("Compressed TNT loaded: {} tiers, tier 10 = {}x TNT power", TIERS, multiplierOf(TIERS));
+                LOGGER.info("TNT Minecraft loaded: {} tiers (9x each), tier 10 = {}x TNT power, radius {} blocks",
+                                TIERS, multiplierOf(TIERS), (int) CompressedTntEntity.radiusOf(TIERS));
         }
 
         public static long multiplierOf(int tier) {

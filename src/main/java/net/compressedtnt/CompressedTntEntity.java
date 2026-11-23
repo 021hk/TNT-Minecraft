@@ -26,21 +26,33 @@ import net.minecraft.world.explosion.Explosion;
 /**
  * Primed compressed TNT. Behaves like vanilla primed TNT while counting down,
  * but instead of a regular explosion it detonates as a "nuke": a spherical
- * shockwave that expands over several ticks, vaporizing blocks shell by shell,
+ * shockwave that expands over several ticks, vaporizing blocks ring by ring,
  * priming other (compressed) TNT blocks it reaches, throwing and killing
- * entities, with continuous explosion sounds and particles. Doing it in shells
- * instead of one giant vanilla explosion keeps the game from freezing/crashing
- * with the astronomically high power values of high tiers.
+ * entities, with continuous explosion sounds and particles.
+ *
+ * v1.2.0 fixes:
+ *  - each tier now has its own, clearly bigger destruction radius
+ *  - the ring geometry no longer leaves leftover blocks (the previous code
+ *    skipped the block layer right at the inner shell boundary)
+ *  - destroyed blocks are set to air WITH neighbor updates (flag 3), so
+ *    water/lava flow again and players can normally mine the area
+ *  - destruction is paced per tick (budget) so even tier 10 does not freeze
+ *    the server; the wave rolls outward over several seconds
  */
 public class CompressedTntEntity extends TntEntity {
         private static final double SHELL_STEP = 4.0;
+        /** max blocks vaporized per tick - keeps the server responsive */
+        private static final int DESTROY_BUDGET = 50_000;
+        /** one clearly different radius per tier: 8 + 8*(tier-1) blocks */
+        private static final double[] RADII = {8, 16, 24, 32, 40, 48, 56, 64, 72, 80};
 
         private int tier = 1;
         private float blastPower = 36.0f;
         private int remainingTicks = 80;
         private boolean nuking = false;
-        private double nukeRadius = 0.0;
-        private double nukeMaxRadius = 36.0;
+        private double nukeMaxRadius = 14.0;
+        private int nukeShell = 0;
+        private int nukeColumn = -1; // next column index in the current shell; -1 = shell done
         private Vec3d center = Vec3d.ZERO;
 
         public CompressedTntEntity(EntityType<? extends CompressedTntEntity> type, World world) {
@@ -53,12 +65,16 @@ public class CompressedTntEntity extends TntEntity {
                 this.tier = tier;
                 this.blastPower = power;
                 this.remainingTicks = Math.max(1, fuseTicks);
-                // destruction saturates at a 64-block radius; beyond that only the
-                // stat (power) keeps growing so the game stays stable
-                this.nukeMaxRadius = Math.min(this.blastPower, Math.min(32.0 + 8.0 * this.tier, 64.0));
+                this.nukeMaxRadius = radiusOf(this.tier);
                 // the fuse stored in the vanilla data tracker is only used by the
                 // renderer for the flashing effect; the real countdown is remainingTicks
                 super.setFuse(this.remainingTicks);
+        }
+
+        /** destruction radius (in blocks) for a tier */
+        public static double radiusOf(int tier) {
+                int idx = MathHelper.clamp(tier, 1, RADII.length) - 1;
+                return RADII[idx];
         }
 
         @Override
@@ -100,7 +116,8 @@ public class CompressedTntEntity extends TntEntity {
                 World world = this.getWorld();
                 this.nuking = true;
                 this.center = new Vec3d(this.getX(), this.getY() + 0.49, this.getZ());
-                this.nukeRadius = 0.0;
+                this.nukeShell = 0;
+                this.nukeColumn = 0;
                 this.setNoGravity(true);
                 this.setInvisible(true);
                 world.playSound(null, BlockPos.ofFloored(this.center), SoundEvents.ENTITY_GENERIC_EXPLODE.value(), SoundCategory.BLOCKS, 4.0f, 0.5f);
@@ -116,22 +133,33 @@ public class CompressedTntEntity extends TntEntity {
                         return; // client side: effects are synced from the server
                 }
 
-                double previous = this.nukeRadius;
-                this.nukeRadius = Math.min(previous + SHELL_STEP, this.nukeMaxRadius);
-                this.destroyShell(server, previous, this.nukeRadius);
+                double rPrev = Math.min(this.nukeShell * SHELL_STEP, this.nukeMaxRadius);
+                double rCur = Math.min((this.nukeShell + 1) * SHELL_STEP, this.nukeMaxRadius);
+                int destroyed = 0;
+                while (destroyed < DESTROY_BUDGET && rPrev < this.nukeMaxRadius) {
+                        destroyed += this.destroyShellBudgeted(server, rPrev, rCur);
+                        if (this.nukeColumn < 0) {
+                                // shell finished, move to the next one
+                                this.nukeShell++;
+                                this.nukeColumn = 0;
+                                rPrev = Math.min(this.nukeShell * SHELL_STEP, this.nukeMaxRadius);
+                                rCur = Math.min((this.nukeShell + 1) * SHELL_STEP, this.nukeMaxRadius);
+                        }
+                }
 
+                // shockwave effects + damage every tick
                 world.playSound(null, BlockPos.ofFloored(this.center), SoundEvents.ENTITY_GENERIC_EXPLODE.value(), SoundCategory.BLOCKS, 3.0f, 0.4f + this.random.nextFloat() * 0.4f);
                 for (int i = 0; i < 3; i++) {
-                        Vec3d p = this.randomShellPoint(previous, this.nukeRadius);
+                        Vec3d p = this.randomShellPoint(rPrev, rCur);
                         server.spawnParticles(ParticleTypes.EXPLOSION, p.x, p.y, p.z, 1, 0.0, 0.0, 0.0, 0.0);
                 }
                 if (this.random.nextInt(3) == 0) {
-                        Vec3d p = this.randomShellPoint(previous, this.nukeRadius);
+                        Vec3d p = this.randomShellPoint(rPrev, rCur);
                         server.spawnParticles(ParticleTypes.FLASH, p.x, p.y, p.z, 1, 0.0, 0.0, 0.0, 0.0);
                 }
 
                 DamageSource damage = server.getDamageSources().explosion((Explosion) null);
-                Box box = Box.of(this.center, this.nukeRadius * 2.0, this.nukeRadius * 2.0, this.nukeRadius * 2.0);
+                Box box = Box.of(this.center, rCur * 2.0, rCur * 2.0, rCur * 2.0);
                 for (Entity entity : server.getOtherEntities(this, box)) {
                         if (entity instanceof PlayerEntity player && (player.getAbilities().creativeMode || player.isSpectator())) {
                                 continue;
@@ -148,11 +176,7 @@ public class CompressedTntEntity extends TntEntity {
                         }
                 }
 
-                if (this.nukeRadius >= this.nukeMaxRadius) {
-                        // mop-up sweep: one full pass over the whole sphere so that no
-                        // block inside the blast can survive (guards against column/edge
-                        // edge cases reported by players as "some blocks remain")
-                        this.destroyShell(server, 0.0, this.nukeMaxRadius);
+                if (rPrev >= this.nukeMaxRadius) {
                         world.playSound(null, BlockPos.ofFloored(this.center), SoundEvents.ENTITY_GENERIC_EXPLODE.value(), SoundCategory.BLOCKS, 5.0f, 0.3f);
                         this.discard();
                 }
@@ -168,47 +192,71 @@ public class CompressedTntEntity extends TntEntity {
                                 this.center.z + radius * Math.cos(pitch) * Math.sin(angle));
         }
 
-        private void destroyShell(ServerWorld world, double rPrev, double r) {
+        /**
+         * Destroys the spherical shell [rPrev, r], starting from {@code nukeColumn}
+         * and stopping when the per-tick budget is used up (the cursor is stored so
+         * the shell continues on the next tick). Every block whose CENTER lies
+         * strictly between the two spheres is destroyed - the enumeration covers
+         * the full bounding box, so no block can be missed.
+         */
+        private int destroyShellBudgeted(ServerWorld world, double rPrev, double r) {
                 int minX = MathHelper.floor(this.center.x - r);
                 int maxX = MathHelper.floor(this.center.x + r);
                 int minZ = MathHelper.floor(this.center.z - r);
                 int maxZ = MathHelper.floor(this.center.z + r);
+                int zSpan = maxZ - minZ + 1;
+                int total = (maxX - minX + 1) * zSpan;
+                int idx = Math.max(this.nukeColumn, 0);
+                if (idx >= total) {
+                        this.nukeColumn = -1;
+                        return 0;
+                }
+
                 int yFloor = world.getBottomY();
                 int yCeil = world.getTopY() - 1;
-
                 double r2 = r * r;
                 double rp2 = rPrev * rPrev;
+                int destroyedTotal = 0;
 
-                for (int x = minX; x <= maxX; x++) {
-                        int chunkX = x >> 4;
-                        for (int z = minZ; z <= maxZ; z++) {
-                                if (world.getChunk(chunkX, z >> 4, ChunkStatus.FULL, false) == null) {
-                                        continue; // skip unloaded chunks so we never trigger worldgen lag
-                                }
-                                // only visit the y range where this column intersects the shell
-                                double dx = x + 0.5 - this.center.x;
-                                double dz = z + 0.5 - this.center.z;
-                                double dXZ2 = dx * dx + dz * dz;
-                                if (dXZ2 > r2) {
-                                        continue;
-                                }
-                                double outerHalf = Math.sqrt(r2 - dXZ2);
-                                int outerTop = Math.min(yCeil, MathHelper.floor(this.center.y + outerHalf));
-                                int outerBottom = Math.max(yFloor, MathHelper.ceil(this.center.y - outerHalf));
-                                if (dXZ2 <= rp2) {
-                                        double innerHalf = Math.sqrt(rp2 - dXZ2);
-                                        int innerTop = MathHelper.floor(this.center.y + innerHalf);
-                                        int innerBottom = MathHelper.ceil(this.center.y - innerHalf);
-                                        this.vaporizeColumn(world, x, z, innerTop + 1, outerTop, r2, rp2); // cap above the hole
-                                        this.vaporizeColumn(world, x, z, outerBottom, innerBottom - 1, r2, rp2); // cap below the hole
-                                } else {
-                                        this.vaporizeColumn(world, x, z, outerBottom, outerTop, r2, rp2);
-                                }
+                for (; idx < total; idx++) {
+                        int x = minX + idx / zSpan;
+                        int z = minZ + idx % zSpan;
+                        if (world.getChunk(x >> 4, z >> 4, ChunkStatus.FULL, false) == null) {
+                                continue; // skip unloaded chunks so we never trigger worldgen lag
+                        }
+                        double dx = x + 0.5 - this.center.x;
+                        double dz = z + 0.5 - this.center.z;
+                        double dXZ2 = dx * dx + dz * dz;
+                        if (dXZ2 > r2) {
+                                continue;
+                        }
+                        double outerHalf = Math.sqrt(r2 - dXZ2);
+                        int outerTop = Math.min(yCeil, MathHelper.floor(this.center.y + outerHalf));
+                        int outerBottom = Math.max(yFloor, MathHelper.ceil(this.center.y - outerHalf));
+                        if (dXZ2 <= rp2) {
+                                double innerHalf = Math.sqrt(rp2 - dXZ2);
+                                int innerTop = MathHelper.floor(this.center.y + innerHalf);
+                                int innerBottom = MathHelper.ceil(this.center.y - innerHalf);
+                                // NOTE: the ranges INCLUDE the inner boundary layers; the exact
+                                // distance check inside vaporizeColumn skips anything that is
+                                // still inside the inner sphere. Widening the range by one layer
+                                // is what fixes the "some blocks never explode" bug.
+                                destroyedTotal += this.vaporizeColumn(world, x, z, innerTop, outerTop, r2, rp2);
+                                destroyedTotal += this.vaporizeColumn(world, x, z, outerBottom, innerBottom, r2, rp2);
+                        } else {
+                                destroyedTotal += this.vaporizeColumn(world, x, z, outerBottom, outerTop, r2, rp2);
+                        }
+                        if (destroyedTotal >= DESTROY_BUDGET) {
+                                this.nukeColumn = idx + 1; // continue with the next column next tick
+                                return destroyedTotal;
                         }
                 }
+                this.nukeColumn = -1;
+                return destroyedTotal;
         }
 
-        private void vaporizeColumn(ServerWorld world, int x, int z, int yFrom, int yTo, double r2, double rp2) {
+        private int vaporizeColumn(ServerWorld world, int x, int z, int yFrom, int yTo, double r2, double rp2) {
+                int destroyed = 0;
                 for (int y = yFrom; y <= yTo; y++) {
                         double dx = x + 0.5 - this.center.x;
                         double dy = y + 0.5 - this.center.y;
@@ -231,17 +279,21 @@ public class CompressedTntEntity extends TntEntity {
                                 world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
                                 world.spawnEntity(new CompressedTntEntity(world, x + 0.5, y, z,
                                                 compressed.tier, compressed.power(), state.get(CompressedTntBlock.FUSE) * 20));
+                                destroyed++;
                                 continue;
                         }
                         if (state.isOf(Blocks.TNT)) {
                                 world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
                                 world.spawnEntity(new TntEntity(world, x + 0.5, y, z, null));
+                                destroyed++;
                                 continue;
                         }
-                        // NOTIFY_ALL (no FORCE_STATE): neighbors get updates so
-                        // water/lava flow back in, sand/gravel fall, redstone updates
+                        // flag 3 = notify neighbors + sync to clients: water/lava start
+                        // flowing, falling blocks fall, players can mine normally
                         world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+                        destroyed++;
                 }
+                return destroyed;
         }
 
         @Override
@@ -251,11 +303,12 @@ public class CompressedTntEntity extends TntEntity {
                 nbt.putFloat("CompressedPower", this.blastPower);
                 nbt.putInt("CompressedFuse", this.remainingTicks);
                 nbt.putBoolean("CompressedNuking", this.nuking);
+                nbt.putDouble("CompressedNukeMax", this.nukeMaxRadius);
+                nbt.putInt("CompressedNukeShell", this.nukeShell);
+                nbt.putInt("CompressedNukeCol", this.nukeColumn);
                 nbt.putDouble("CompressedCx", this.center.x);
                 nbt.putDouble("CompressedCy", this.center.y);
                 nbt.putDouble("CompressedCz", this.center.z);
-                nbt.putDouble("CompressedNukeR", this.nukeRadius);
-                nbt.putDouble("CompressedNukeMax", this.nukeMaxRadius);
         }
 
         @Override
@@ -270,8 +323,13 @@ public class CompressedTntEntity extends TntEntity {
                 this.remainingTicks = Math.max(1, nbt.getInt("CompressedFuse"));
                 super.setFuse(this.remainingTicks);
                 this.nuking = nbt.getBoolean("CompressedNuking");
+                this.nukeMaxRadius = nbt.contains("CompressedNukeMax", NbtElement.DOUBLE_TYPE)
+                                ? nbt.getDouble("CompressedNukeMax") : radiusOf(this.tier);
+                this.nukeShell = Math.max(0, nbt.getInt("CompressedNukeShell"));
+                this.nukeColumn = nuking ? Math.max(-1, nbt.getInt("CompressedNukeCol")) : -1;
                 this.center = new Vec3d(nbt.getDouble("CompressedCx"), nbt.getDouble("CompressedCy"), nbt.getDouble("CompressedCz"));
-                this.nukeRadius = nbt.getDouble("CompressedNukeR");
-                this.nukeMaxRadius = nbt.getDouble("CompressedNukeMax");
+                if (this.center.equals(Vec3d.ZERO)) {
+                        this.center = new Vec3d(this.getX(), this.getY() + 0.49, this.getZ());
+                }
         }
 }
