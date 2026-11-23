@@ -1,12 +1,13 @@
 say TNTTEST_DETONATE
-# redstone placed AFTER the tnt so the neighbor update primes it
+# a redstone block next to every TNT primes it through the vanilla redstone path
 setblock 1 -60 0 minecraft:redstone_block
 setblock 201 -60 0 minecraft:redstone_block
 setblock 401 -60 0 minecraft:redstone_block
-setblock 601 -60 0 minecraft:redstone_block
-setblock 1001 -60 0 minecraft:redstone_block
-# armed timer: 3 seconds auto-explode
-setblock 800 -60 0 compressedtnt:compressed_tnt[fuse=3]{IgniteRemaining:60}
-# mining/drops test: blocks inside spawn chunks (always ticking)
-setblock 30 -60 0 compressedtnt:double_compressed_tnt
-setblock 40 -60 0 compressedtnt:double_compressed_tnt
+setblock 601 -60 9 minecraft:redstone_block
+setblock 651 -60 9 minecraft:redstone_block
+setblock 681 -60 9 minecraft:redstone_block
+setblock 1101 -60 0 minecraft:redstone_block
+# drop test: "mining" the double compressed TNT must drop itself
+kill @e[type=minecraft:item]
+setblock 800 -60 0 minecraft:air destroy
+say TNTTEST_DETONATE_DONE

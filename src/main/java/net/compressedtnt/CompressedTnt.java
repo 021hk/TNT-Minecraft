@@ -1,30 +1,26 @@
 package net.compressedtnt;
 
-import com.mojang.serialization.Codec;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.minecraft.block.AbstractBlock;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.component.ComponentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,14 +38,9 @@ public class CompressedTnt implements ModInitializer {
 
         public static final CompressedTntBlock[] BLOCKS = new CompressedTntBlock[TIERS];
 
-        /** fuse timer (in seconds) stored on the ITEM via the G-key input screen */
-        public static final ComponentType<Integer> TIMER_SECONDS = ComponentType.<Integer>builder()
-                        .codec(Codec.intRange(0, 3600))
-                        .packetCodec(PacketCodecs.VAR_INT)
-                        .build();
-
-        /** registered after the blocks, in onInitialize */
-        public static BlockEntityType<CompressedTntBlockEntity> BLOCK_ENTITY_TYPE;
+        public static final MaterialTntBlock DIRT_TNT = new MaterialTntBlock(MaterialTntBlock.Type.DIRT, settings());
+        public static final MaterialTntBlock STONE_TNT = new MaterialTntBlock(MaterialTntBlock.Type.STONE, settings());
+        public static final MaterialTntBlock CROP_TNT = new MaterialTntBlock(MaterialTntBlock.Type.CROP, settings());
 
         public static final EntityType<CompressedTntEntity> PRIMED_COMPRESSED_TNT = Registry.register(
                         Registries.ENTITY_TYPE,
@@ -58,58 +49,69 @@ public class CompressedTnt implements ModInitializer {
                                         .dimensions(EntityDimensions.fixed(0.98f, 0.98f))
                                         .build());
 
+        public static final EntityType<MaterialTntEntity> MATERIAL_TNT = Registry.register(
+                        Registries.ENTITY_TYPE,
+                        Identifier.of(MOD_ID, "material_tnt"),
+                        FabricEntityTypeBuilder.<MaterialTntEntity>create(SpawnGroup.MISC, MaterialTntEntity::new)
+                                        .dimensions(EntityDimensions.fixed(0.98f, 0.98f))
+                                        .build());
+
+        private static AbstractBlock.Settings settings() {
+                return AbstractBlock.Settings.create().strength(0.0f, 0.0f).sounds(BlockSoundGroup.GRASS);
+        }
+
         @Override
         public void onInitialize() {
-                Registry.register(Registries.DATA_COMPONENT_TYPE, Identifier.of(MOD_ID, "timer_seconds"), TIMER_SECONDS);
-
                 for (int i = 0; i < TIERS; i++) {
                         int tier = i + 1;
-                        CompressedTntBlock block = new CompressedTntBlock(tier,
-                                        AbstractBlock.Settings.create().strength(0.0f, 0.0f).sounds(BlockSoundGroup.GRASS));
+                        CompressedTntBlock block = new CompressedTntBlock(tier, settings());
                         Identifier id = Identifier.of(MOD_ID, BLOCK_IDS[i]);
                         Registry.register(Registries.BLOCK, id, block);
                         Registry.register(Registries.ITEM, id, new CompressedTntBlockItem(block, tier, new Item.Settings()));
                         BLOCKS[i] = block;
                 }
 
-                BLOCK_ENTITY_TYPE = Registry.register(
-                                Registries.BLOCK_ENTITY_TYPE,
-                                Identifier.of(MOD_ID, "compressed_tnt"),
-                                BlockEntityType.Builder.create(CompressedTntBlockEntity::new, BLOCKS).build(null));
+                registerMaterial(DIRT_TNT, "dirt_tnt");
+                registerMaterial(STONE_TNT, "stone_tnt");
+                registerMaterial(CROP_TNT, "crop_tnt");
 
                 RegistryKey<net.minecraft.item.ItemGroup> redstoneTab = RegistryKey.of(
                                 RegistryKeys.ITEM_GROUP, Identifier.ofVanilla("redstone"));
-                ItemGroupEvents.modifyEntriesEvent(redstoneTab).register(
-                                entries -> {
-                                        for (CompressedTntBlock block : BLOCKS) {
-                                                entries.add(block);
-                                        }
-                                });
-
-                // keyboard timer: client screen sends the seconds, server stores them
-                // on the held compressed TNT item
-                PayloadTypeRegistry.playC2S().register(SetTimerPayload.ID, SetTimerPayload.CODEC);
-                ServerPlayNetworking.registerGlobalReceiver(SetTimerPayload.ID, (payload, context) -> {
-                        ServerPlayerEntity player = context.player();
-                        int seconds = MathHelper.clamp(payload.seconds(), 0, 3600);
-                        ItemStack main = player.getMainHandStack();
-                        ItemStack off = player.getOffHandStack();
-                        ItemStack target = main.getItem() instanceof CompressedTntBlockItem ? main
-                                        : off.getItem() instanceof CompressedTntBlockItem ? off : null;
-                        if (target == null) {
-                                return;
+                ItemGroupEvents.modifyEntriesEvent(redstoneTab).register(entries -> {
+                        for (CompressedTntBlock block : BLOCKS) {
+                                entries.add(block);
                         }
-                        if (seconds > 0) {
-                                target.set(TIMER_SECONDS, seconds);
-                                player.sendMessage(Text.translatable("compressedtnt.timer_set_item", seconds).formatted(Formatting.GOLD), true);
-                        } else {
-                                target.remove(TIMER_SECONDS);
-                                player.sendMessage(Text.translatable("compressedtnt.timer_removed").formatted(Formatting.YELLOW), true);
-                        }
+                        entries.add(DIRT_TNT);
+                        entries.add(STONE_TNT);
+                        entries.add(CROP_TNT);
                 });
 
-                LOGGER.info("TNT Minecraft loaded: {} tiers (9x each), tier 10 = {}x TNT power, radius {} blocks",
-                                TIERS, multiplierOf(TIERS), (int) CompressedTntEntity.radiusOf(TIERS));
+                // unified timer: hold right-click ~1 s on any TNT, then /tntfuse <seconds>
+                CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
+                                CommandManager.literal("tntfuse")
+                                                .then(CommandManager.argument("seconds", IntegerArgumentType.integer(1, 600))
+                                                                .executes(context -> {
+                                                                        ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+                                                                        ServerWorld world = player.getServerWorld();
+                                                                        int seconds = IntegerArgumentType.getInteger(context, "seconds");
+                                                                        if (FuseHoldTracker.primeFromCommand(player, world, seconds)) {
+                                                                                player.sendMessage(Text.translatable("compressedtnt.fuse_set", seconds), false);
+                                                                                return 1;
+                                                                        }
+                                                                        context.getSource().sendError(Text.translatable("compressedtnt.fuse_no_target"));
+                                                                        return 0;
+                                                                }))));
+
+                ServerTickEvents.END_SERVER_TICK.register(server -> FuseHoldTracker.endServerTick(server));
+
+                LOGGER.info("TNT Minecraft loaded: {} compressed tiers (9x volume each: radii 8/17/36/75/128), 3 material TNTs (dirt/stone/crop)",
+                                TIERS);
+        }
+
+        private static void registerMaterial(MaterialTntBlock block, String id) {
+                Registry.register(Registries.BLOCK, Identifier.of(MOD_ID, id), block);
+                Registry.register(Registries.ITEM, Identifier.of(MOD_ID, id),
+                                new MaterialTntBlockItem(block, new Item.Settings()));
         }
 
         public static long multiplierOf(int tier) {
