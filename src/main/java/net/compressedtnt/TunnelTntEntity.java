@@ -44,9 +44,20 @@ public class TunnelTntEntity extends TntEntity {
                 super(CompressedTnt.TUNNEL_TNT, world);
                 this.setPosition(x, y, z);
                 this.vertical = vertical;
-                this.direction = direction;
+                this.direction = normalize(vertical, direction);
                 this.remainingTicks = Math.max(1, fuseTicks);
                 super.setFuse(this.remainingTicks);
+        }
+
+        /** vertical tunnel TNT must always bore UP or DOWN, never sideways */
+        private static Direction normalize(boolean vertical, Direction direction) {
+                if (vertical && direction.getAxis().isHorizontal()) {
+                        return Direction.DOWN;
+                }
+                if (!vertical && !direction.getAxis().isHorizontal()) {
+                        return Direction.NORTH;
+                }
+                return direction;
         }
 
         @Override
@@ -84,7 +95,7 @@ public class TunnelTntEntity extends TntEntity {
 
         private void bore(ServerWorld server) {
                 BlockPos center = BlockPos.ofFloored(this.getX(), this.getY(), this.getZ());
-                Direction dir = this.direction;
+                Direction dir = normalize(this.vertical, this.direction);
                 int cleared = 0;
 
                 for (int i = 0; i < LENGTH; i++) {
@@ -92,34 +103,18 @@ public class TunnelTntEntity extends TntEntity {
                         int levels = this.vertical ? 1 : 2; // 1x1 shaft, or 1 wide x 2 high
                         for (int h = 0; h < levels; h++) {
                                 BlockPos pos = this.vertical ? base : base.up(h);
-                                BlockState state = server.getBlockState(pos);
-                                if (state.isAir() || state.isOf(Blocks.BEDROCK) || state.isOf(Blocks.BARRIER)
-                                                || state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN)
-                                                || state.isOf(Blocks.REINFORCED_DEEPSLATE)) {
-                                        continue;
+                                try {
+                                        cleared += boreOne(server, pos);
+                                } catch (Exception e) {
+                                        // one weird block must never kill the world tick -
+                                        // log it and force the block out of the way
+                                        CompressedTnt.LOGGER.warn("Tunnel TNT: could not bore {} at {}: {}",
+                                                        server.getBlockState(pos).getBlock(), pos.toShortString(), e.toString());
+                                        try {
+                                                server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+                                        } catch (Exception ignored) {
+                                        }
                                 }
-                                Block block = state.getBlock();
-                                if (block instanceof CompressedTntBlock compressed) {
-                                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
-                                        server.spawnEntity(new CompressedTntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
-                                                        compressed.tier, compressed.power(), 80));
-                                } else if (block instanceof MaterialTntBlock material) {
-                                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
-                                        server.spawnEntity(new MaterialTntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
-                                                        material.type, 80));
-                                } else if (block instanceof TunnelTntBlock) {
-                                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
-                                        // chained tunnel TNT continues the same tunnel
-                                        server.spawnEntity(new TunnelTntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
-                                                        this.vertical, dir, 40));
-                                } else if (state.isOf(Blocks.TNT)) {
-                                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
-                                        server.spawnEntity(new TntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, null));
-                                } else {
-                                        // drop the block's loot on the ground (right tool simulation)
-                                        BlockDrops.breakWithLoot(server, pos, state);
-                                }
-                                cleared++;
                         }
                 }
 
@@ -132,6 +127,38 @@ public class TunnelTntEntity extends TntEntity {
                         server.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5, 1, 0.0, 0.05, 0.0, 0.01);
                 }
                 CompressedTnt.LOGGER.info("Tunnel TNT bored {} blocks {} at {} (vertical={})", cleared, dir, center.toShortString(), this.vertical);
+        }
+
+        /** Bores one block position; returns 1 when a block was removed. */
+        private int boreOne(ServerWorld server, BlockPos pos) {
+                BlockState state = server.getBlockState(pos);
+                if (state.isAir() || state.isOf(Blocks.BEDROCK) || state.isOf(Blocks.BARRIER)
+                                || state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.CRYING_OBSIDIAN)
+                                || state.isOf(Blocks.REINFORCED_DEEPSLATE)) {
+                        return 0;
+                }
+                Block block = state.getBlock();
+                if (block instanceof CompressedTntBlock compressed) {
+                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+                        server.spawnEntity(new CompressedTntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
+                                        compressed.tier, compressed.power(), 80));
+                } else if (block instanceof MaterialTntBlock material) {
+                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+                        server.spawnEntity(new MaterialTntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
+                                        material.type, 80));
+                } else if (block instanceof TunnelTntBlock) {
+                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+                        // chained tunnel TNT continues the same tunnel
+                        server.spawnEntity(new TunnelTntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
+                                        this.vertical, normalize(this.vertical, this.direction), 40));
+                } else if (state.isOf(Blocks.TNT)) {
+                        server.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
+                        server.spawnEntity(new TntEntity(server, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, null));
+                } else {
+                        // drop the block's loot on the ground (right tool simulation)
+                        BlockDrops.breakWithLoot(server, pos, state);
+                }
+                return 1;
         }
 
         @Override
@@ -150,9 +177,9 @@ public class TunnelTntEntity extends TntEntity {
                 super.setFuse(this.remainingTicks);
                 this.vertical = nbt.getBoolean("TunnelVertical");
                 try {
-                        this.direction = Direction.valueOf(nbt.getString("TunnelDirection"));
+                        this.direction = normalize(this.vertical, Direction.valueOf(nbt.getString("TunnelDirection")));
                 } catch (IllegalArgumentException e) {
-                        this.direction = Direction.NORTH;
+                        this.direction = this.vertical ? Direction.DOWN : Direction.NORTH;
                 }
         }
 }

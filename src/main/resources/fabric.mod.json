@@ -1,29 +1,31 @@
 {
-	"schemaVersion": 1,
-	"id": "compressedtnt",
-	"version": "${version}",
-	"name": "TNT Minecraft",
-	"description": "9 TNT -> 1 compressed TNT, 10 tiers, each 9x the destroyed volume of the last (radius 8/17/36/75/128). Fuse-timer GUI on right-click for EVERY TNT (even vanilla): 0-3600 s. Dirt/Stone/Crop/Wood TNT: 4 material + 4 gunpowder, clears its material in a 10x10x10 area with zero damage and drops the items. Tunnel TNTs: 3 TNT in a row/column -> bores a straight tunnel with an arrow marker. TNT-Infused gear: 8 TNT + any armor/tool -> armor blocks 90% of explosion damage, tools get a 4-8% chance of a small blast. Friendly bow-tie creepers (pink=female, blue=male) spawn in the day, breed with bone meal/coal, and explode when hit. English + Persian.",
-	"authors": ["021hk"],
-	"contact": {},
-	"license": "MIT",
-	"icon": "assets/compressedtnt/icon.png",
-	"environment": "*",
-	"entrypoints": {
-		"main": [
-			"net.compressedtnt.CompressedTnt"
-		],
-		"client": [
-			"net.compressedtnt.client.CompressedTntClient"
-		]
-	},
-	"mixins": [
-		"compressedtnt.mixins.json"
-	],
-	"depends": {
-		"fabricloader": ">=0.16.0",
-		"minecraft": ">=1.21 <=1.21.1",
-		"java": ">=21",
-		"fabric-api": "*"
-	}
+ "schemaVersion": 1,
+ "id": "compressedtnt",
+ "version": "${version}",
+ "name": "TNT Minecraft",
+ "description": "9 TNT -> 1 compressed TNT, 10 tiers, each 9x the destroyed volume of the last (radius 8/17/36/75/128). Fuse-timer GUI on right-click for EVERY TNT (even vanilla): 0-3600 s. Dirt/Stone/Crop/Wood TNT: 4 material + 4 gunpowder, clears its material in a 10x10x10 area with zero damage and drops the items. Tunnel TNTs: 3 TNT in a row/column -> bores a straight tunnel with an arrow marker. TNT-Infused gear: 8 TNT + any armor/tool -> armor blocks 90% of explosion damage, tools get a 4-8% chance of a small blast. Friendly bow-tie creepers (pink=female, blue=male) spawn in the day, breed with bone meal/coal, and explode when hit. English + Persian.",
+ "authors": [
+  "021hk"
+ ],
+ "contact": {},
+ "license": "MIT",
+ "icon": "assets/compressedtnt/icon.png",
+ "environment": "*",
+ "entrypoints": {
+  "main": [
+   "net.compressedtnt.CompressedTnt"
+  ],
+  "client": [
+   "net.compressedtnt.client.CompressedTntClient"
+  ]
+ },
+ "mixins": [
+  "compressedtnt.mixins.json"
+ ],
+ "depends": {
+  "fabricloader": ">=0.16.0",
+  "minecraft": ">=1.21 <=1.21.1",
+  "java": ">=21",
+  "fabric-api": "*"
+ }
 }

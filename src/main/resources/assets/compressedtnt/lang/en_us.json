@@ -35,7 +35,7 @@
   "compressedtnt.tunnel_tooltip.h": "Bores a straight tunnel: 12 blocks long, 1 wide x 2 high, in the direction of the arrow. No entity damage - items drop on the ground.",
   "compressedtnt.tunnel_tooltip.v": "Bores a straight shaft: 12 blocks long, 1x1, up or down. Look up while placing for up, otherwise down. No entity damage - items drop on the ground.",
   "compressedtnt.infused_line1": "TNT-Infused",
-  "compressedtnt.infused_line2": "Armor: -22.5% explosion damage per piece (-90% full set). Tools: work normally, 4-8% chance of a small blast.",
+  "compressedtnt.infused_line2": "Armor: -22.5% explosion damage per piece (-90% full set). Tools: work normally, 4-8% chance of a small blast that only hits mobs, or blocks of the same material (wood blast -> only wood, never ground or leaves).",
   "compressedtnt.creeper_hint1": "Tame but explosive: it walks to you when you hold bone meal or coal,",
   "compressedtnt.creeper_hint2": "but if you hit it, it explodes! Feed a male (blue) + a female (pink) to breed."
 }

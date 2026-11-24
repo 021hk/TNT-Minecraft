@@ -95,14 +95,28 @@ public class MaterialTntEntity extends TntEntity {
                         for (int y = center.getY() - RADIUS + 1; y <= center.getY() + RADIUS; y++) {
                                 for (int z = center.getZ() - RADIUS; z <= center.getZ() + RADIUS - 1; z++) {
                                         BlockPos pos = new BlockPos(x, y, z);
-                                        BlockState state = server.getBlockState(pos);
+                                        BlockState state;
+                                        try {
+                                                state = server.getBlockState(pos);
+                                        } catch (Exception e) {
+                                                continue;
+                                        }
                                         Block block = state.getBlock();
                                         if (state.isOf(Blocks.BEDROCK) || !targets.test(state)) {
                                                 continue;
                                         }
                                         // drop the block's normal loot (items) on the ground, as if
                                         // mined with the right tool - stone drops cobblestone etc.
-                                        BlockDrops.breakWithLoot(server, pos, state);
+                                        try {
+                                                BlockDrops.breakWithLoot(server, pos, state);
+                                        } catch (Exception e) {
+                                                CompressedTnt.LOGGER.warn("Material TNT: could not clear {} at {}: {}",
+                                                                block, pos.toShortString(), e.toString());
+                                                try {
+                                                        server.setBlockState(pos, Blocks.AIR.getDefaultState());
+                                                } catch (Exception ignored) {
+                                                }
+                                        }
                                         cleared++;
                                 }
                         }

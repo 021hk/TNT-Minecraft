@@ -24,11 +24,20 @@ public final class BlockDrops {
 
         /** Removes the block and drops its loot on the ground. */
         public static void breakWithLoot(ServerWorld world, BlockPos pos, BlockState state) {
-                LootContextParameterSet.Builder params = new LootContextParameterSet.Builder(world)
-                                .add(LootContextParameters.ORIGIN, Vec3d.ofCenter(pos))
-                                .add(LootContextParameters.TOOL, toolFor(state))
-                                .add(LootContextParameters.BLOCK_STATE, state);
-                state.getDroppedStacks(params).forEach(stack -> Block.dropStack(world, pos, stack));
+                try {
+                        LootContextParameterSet.Builder params = new LootContextParameterSet.Builder(world)
+                                        .add(LootContextParameters.ORIGIN, Vec3d.ofCenter(pos))
+                                        .add(LootContextParameters.TOOL, toolFor(state))
+                                        .add(LootContextParameters.BLOCK_STATE, state);
+                        state.getDroppedStacks(params).forEach(stack -> Block.dropStack(world, pos, stack));
+                } catch (Exception e) {
+                        // a broken / exotic loot table must never stop the world tick:
+                        // drop the plain block item instead (best effort)
+                        try {
+                                Block.dropStack(world, pos, new ItemStack(state.getBlock()));
+                        } catch (Exception ignored) {
+                        }
+                }
                 world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
         }
 
