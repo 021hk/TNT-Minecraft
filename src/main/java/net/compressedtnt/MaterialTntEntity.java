@@ -97,11 +97,12 @@ public class MaterialTntEntity extends TntEntity {
                                         BlockPos pos = new BlockPos(x, y, z);
                                         BlockState state = server.getBlockState(pos);
                                         Block block = state.getBlock();
-                                        if (!targets.contains(block) || state.isOf(Blocks.BEDROCK)) {
+                                        if (state.isOf(Blocks.BEDROCK) || !targets.test(state)) {
                                                 continue;
                                         }
-                                        // drop = true: the block's normal loot (items) spawn on the ground
-                                        server.breakBlock(pos, true);
+                                        // drop the block's normal loot (items) on the ground, as if
+                                        // mined with the right tool - stone drops cobblestone etc.
+                                        BlockDrops.breakWithLoot(server, pos, state);
                                         cleared++;
                                 }
                         }

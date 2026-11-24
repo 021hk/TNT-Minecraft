@@ -23,4 +23,10 @@ execute if score chk_nodmg tnttest matches 1 run say CHECK_NO_DAMAGE PASS
 execute if score chk_nodmg tnttest matches 0 run say CHECK_NO_DAMAGE FAIL
 execute if score chk_ents tnttest matches 1 run say CHECK_ENTITIES_CLEAN PASS
 execute if score chk_ents tnttest matches 0 run say CHECK_ENTITIES_CLEAN FAIL
-execute if score chk_drops tnttest matches 1 if score chk_fuse tnttest matches 1 if score chk_vfuse tnttest matches 1 if score chk_radius tnttest matches 1 if score chk_left tnttest matches 1 if score chk_water tnttest matches 1 if score chk_dirt tnttest matches 1 if score chk_stone tnttest matches 1 if score chk_crop tnttest matches 1 if score chk_items tnttest matches 1 if score chk_nodmg tnttest matches 1 if score chk_ents tnttest matches 1 run say TNTTEST_ALL_PASS
+execute if score chk_wood tnttest matches 1 run say CHECK_WOOD_TNT PASS
+execute if score chk_wood tnttest matches 0 run say CHECK_WOOD_TNT FAIL
+execute if score chk_tunnel_h tnttest matches 1 run say CHECK_TUNNEL_H PASS
+execute if score chk_tunnel_h tnttest matches 0 run say CHECK_TUNNEL_H FAIL
+execute if score chk_tunnel_v tnttest matches 1 run say CHECK_TUNNEL_V PASS
+execute if score chk_tunnel_v tnttest matches 0 run say CHECK_TUNNEL_V FAIL
+execute if score chk_drops tnttest matches 1 if score chk_fuse tnttest matches 1 if score chk_vfuse tnttest matches 1 if score chk_radius tnttest matches 1 if score chk_left tnttest matches 1 if score chk_water tnttest matches 1 if score chk_dirt tnttest matches 1 if score chk_stone tnttest matches 1 if score chk_crop tnttest matches 1 if score chk_items tnttest matches 1 if score chk_nodmg tnttest matches 1 if score chk_ents tnttest matches 1 if score chk_wood tnttest matches 1 if score chk_tunnel_h tnttest matches 1 if score chk_tunnel_v tnttest matches 1 run say TNTTEST_ALL_PASS

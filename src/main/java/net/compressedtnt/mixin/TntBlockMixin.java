@@ -2,30 +2,22 @@ package net.compressedtnt.mixin;
 
 import net.compressedtnt.CompressedTntBlock;
 import net.compressedtnt.CompressedTntEntity;
-import net.compressedtnt.FuseHoldTracker;
 import net.compressedtnt.MaterialTntBlock;
 import net.compressedtnt.MaterialTntEntity;
+import net.compressedtnt.TunnelTntBlock;
+import net.compressedtnt.TunnelTntEntity;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.TntBlock;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.TntEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ItemActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import net.minecraft.world.explosion.Explosion;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Every vanilla ignition path funnels into either
@@ -37,10 +29,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * sites so that when the block being primed is one of our TNT blocks, the
  * matching custom entity is spawned instead.
  *
- * Additionally the right-click-hold fuse timer works on VANILLA TNT as well:
- * holding the use button on a vanilla TNT block for ~1 second shows the
- * {@code /tntfuse} prompt, and {@code /tntfuse} primes the vanilla TNT entity
- * with the requested fuse through {@link FuseHoldTracker#primeTntWithFuse}.
+ * The right-click fuse-timer screen works on VANILLA TNT as well - the
+ * UseBlockCallback registered in {@link net.compressedtnt.CompressedTnt}
+ * intercepts the interaction for every TntBlock, vanilla or modded.
  */
 @Mixin(TntBlock.class)
 public abstract class TntBlockMixin {
@@ -74,26 +65,11 @@ public abstract class TntBlockMixin {
                 if (state.getBlock() instanceof MaterialTntBlock material) {
                         return new MaterialTntEntity(entityWorld, x, y, z, material.type, 80);
                 }
-                return new TntEntity(entityWorld, x, y, z, igniter);
-        }
-
-        /**
-         * Hold right-click ~1 s on a VANILLA TNT block to get the fuse prompt.
-         * Sneaking keeps the vanilla behaviour (placing blocks against TNT);
-         * flint &amp; steel / fire charge keep igniting it normally.
-         */
-        @Inject(
-                        method = "onUseWithItem(Lnet/minecraft/item/ItemStack;Lnet/minecraft/block/BlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/entity/player/PlayerEntity;Lnet/minecraft/util/Hand;Lnet/minecraft/util/hit/BlockHitResult;)Lnet/minecraft/util/ItemActionResult;",
-                        at = @At("HEAD"),
-                        cancellable = true
-        )
-        private void compressedtnt$holdToSetFuse(ItemStack stack, BlockState state, World world, BlockPos pos,
-                        PlayerEntity player, Hand hand, BlockHitResult hit, CallbackInfoReturnable<ItemActionResult> cir) {
-                if (!player.isSneaking() && !stack.isOf(Items.FLINT_AND_STEEL) && !stack.isOf(Items.FIRE_CHARGE)) {
-                        if (world instanceof ServerWorld server && player instanceof ServerPlayerEntity serverPlayer) {
-                                FuseHoldTracker.onTntUse(serverPlayer, server, pos);
-                        }
-                        cir.setReturnValue(ItemActionResult.success(world.isClient));
+                if (state.getBlock() instanceof TunnelTntBlock tunnel) {
+                        boolean vertical = tunnel.mode == TunnelTntBlock.Mode.VERTICAL;
+                        Direction direction = TunnelTntBlock.facing(state, tunnel.mode);
+                        return new TunnelTntEntity(entityWorld, x, y, z, vertical, direction, 80);
                 }
+                return new TntEntity(entityWorld, x, y, z, igniter);
         }
 }

@@ -1,0 +1,21 @@
+{
+        "type": "minecraft:crafting_shaped",
+        "category": "redstone",
+        "pattern": [
+                "GMG",
+                "M M",
+                "GMG"
+        ],
+        "key": {
+                "G": {
+                        "item": "minecraft:gunpowder"
+                },
+                "M": {
+                        "tag": "minecraft:logs"
+                }
+        },
+        "result": {
+                "id": "compressedtnt:wood_tnt",
+                "count": 1
+        }
+}

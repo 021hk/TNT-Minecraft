@@ -50,6 +50,25 @@ summon minecraft:tnt 730 -60 0 {Fuse:40}
 # ===== Area G: block drop (mining equivalent) =====
 setblock 800 -60 0 compressedtnt:double_compressed_tnt
 
+# ===== Area E4: wood TNT (center 760,9) =====
+fill 755 -61 4 764 -61 13 minecraft:oak_log
+fill 757 -60 6 759 -60 8 minecraft:oak_planks
+setblock 762 -61 6 minecraft:stone
+setblock 754 -61 9 minecraft:grass_block
+setblock 760 -60 9 compressedtnt:wood_tnt
+
+# ===== Area I: tunnel horizontal (bores east 851..862) =====
+fill 848 -61 -2 866 -61 2 minecraft:stone
+fill 851 -60 0 862 -60 0 minecraft:stone
+fill 851 -59 0 862 -59 0 minecraft:stone
+setblock 851 -60 0 compressedtnt:tunnel_tnt_horizontal[facing=east]
+setblock 856 -60 3 minecraft:stone
+setblock 863 -60 0 minecraft:stone
+
+# ===== Area J: tunnel vertical (bores down 900, y -60..-71) =====
+fill 899 -61 -1 901 -76 1 minecraft:stone
+setblock 900 -60 0 compressedtnt:tunnel_tnt_vertical[facing=down]
+
 # water source just outside the tier-2 sphere (x=218, dx=18 > 17):
 # after the blast it must flow into the crater
 setblock 218 -58 0 minecraft:water
@@ -66,4 +85,7 @@ scoreboard players set chk_fuse tnttest 0
 scoreboard players set chk_vfuse tnttest 0
 scoreboard players set chk_drops tnttest 0
 scoreboard players set chk_ents tnttest 0
+scoreboard players set chk_wood tnttest 0
+scoreboard players set chk_tunnel_h tnttest 0
+scoreboard players set chk_tunnel_v tnttest 0
 say TNTTEST_SETUP_DONE

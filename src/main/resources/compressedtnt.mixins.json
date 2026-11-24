@@ -3,7 +3,9 @@
 	"package": "net.compressedtnt.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"TntBlockMixin"
+		"TntBlockMixin",
+		"LivingEntityMixin",
+		"ItemStackMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

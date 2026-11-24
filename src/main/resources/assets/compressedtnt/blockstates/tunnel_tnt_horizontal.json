@@ -1,0 +1,8 @@
+{
+	"variants": {
+		"facing=north": { "model": "compressedtnt:block/tunnel_tnt_horizontal" },
+		"facing=east": { "model": "compressedtnt:block/tunnel_tnt_horizontal", "y": 90 },
+		"facing=south": { "model": "compressedtnt:block/tunnel_tnt_horizontal", "y": 180 },
+		"facing=west": { "model": "compressedtnt:block/tunnel_tnt_horizontal", "y": 270 }
+	}
+}

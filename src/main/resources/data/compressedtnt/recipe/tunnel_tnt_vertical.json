@@ -1,0 +1,18 @@
+{
+        "type": "minecraft:crafting_shaped",
+        "category": "redstone",
+        "pattern": [
+                " T ",
+                " T ",
+                " T "
+        ],
+        "key": {
+                "T": {
+                        "item": "minecraft:tnt"
+                }
+        },
+        "result": {
+                "id": "compressedtnt:tunnel_tnt_vertical",
+                "count": 1
+        }
+}

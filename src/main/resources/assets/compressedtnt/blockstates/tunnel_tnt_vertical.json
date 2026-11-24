@@ -1,0 +1,6 @@
+{
+	"variants": {
+		"facing=up": { "model": "compressedtnt:block/tunnel_tnt_vertical" },
+		"facing=down": { "model": "compressedtnt:block/tunnel_tnt_vertical", "x": 180 }
+	}
+}
